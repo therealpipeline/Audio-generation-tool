@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { toBlobURL } from '@ffmpeg/util';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, 
@@ -52,25 +53,11 @@ export default function App() {
 
   useEffect(() => {
     loadFFmpeg();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (apiKey) {
       aiRef.current = new GoogleGenAI({ apiKey });
     }
   }, []);
-
-  const fetchWithTimeout = async (url: string, type: string) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 15000);
-    try {
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(id);
-        const blob = await response.blob();
-        return URL.createObjectURL(new Blob([blob], { type }));
-    } catch (e) {
-        clearTimeout(id);
-        throw e;
-    }
-  };
 
   const loadFFmpeg = async () => {
     try {
@@ -87,10 +74,10 @@ export default function App() {
         console.log('[FFmpeg]', message);
       });
 
-      setFfmpegLog('Downloading FFmpeg core...');
+      setFfmpegLog('Downloading FFmpeg core (25MB)...');
       await ffmpeg.load({
-        coreURL: await fetchWithTimeout(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await fetchWithTimeout(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
       setFfmpegLoaded(true);
       setFfmpegLog('');
