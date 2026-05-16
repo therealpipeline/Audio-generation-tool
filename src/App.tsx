@@ -6,6 +6,7 @@ import wasmURL from '@ffmpeg/core/wasm?url';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, 
+  Pause,
   Download, 
   Loader2, 
   AlertCircle, 
@@ -39,7 +40,7 @@ enum ProcessStep {
 
 export default function App() {
   const [script, setScript] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState(VOICES[1].id);
+  const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id);
   const [step, setStep] = useState<ProcessStep>(ProcessStep.IDLE);
   const [error, setError] = useState<string | null>(null);
   const [finalAudioUrl, setFinalAudioUrl] = useState<string | null>(null);
@@ -51,6 +52,48 @@ export default function App() {
   const ffmpegRef = useRef(new FFmpeg());
   const aiRef = useRef<GoogleGenAI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setAudioProgress(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setAudioDuration(audioRef.current.duration);
+    }
+  };
+  
+  const handleAudioSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = Number(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setAudioProgress(time);
+    }
+  };
+
+  const formatTime = (time: number) => {
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     loadFFmpeg();
@@ -111,9 +154,10 @@ export default function App() {
     setFinalAudioUrl(null);
     setProgressRatio(0);
     setProgressTime(0);
+    setIsPlaying(false);
 
     try {
-      const fullPrompt = `You are recording an energetic, professional voiceover for a YouTube commentary video. Speak with high energy, clear articulation, and engaging pacing. Sound natural, fast, and punchy.\n\nScript: ${script}`;
+      const fullPrompt = `You are recording an energetic, professional voiceover for a YouTube commentary video. Speak with high energy and clear articulation. The delivery should be punchy and engaging, but DO NOT rush. Maintain a clear, steady, and deliberate pace so the listener can easily follow along.\n\nScript: ${script}`;
       
       const actualVoiceToRequest = selectedVoice === 'Aoede' ? 'Zephyr' : selectedVoice;
 
@@ -394,29 +438,56 @@ export default function App() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col sm:flex-row gap-2"
+                className="flex flex-col gap-2"
               >
-                <div className="flex-1 bg-[#121212] rounded-lg md:rounded-xl border border-zinc-800/80 p-1 pl-3 md:p-2 md:pl-4 flex items-center justify-between min-h-[40px] md:min-h-[48px]">
-                  <span className="text-emerald-400 font-medium text-[11px] md:text-sm flex items-center gap-1.5 md:gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                    Ready!
-                  </span>
+                <div className="flex-1 bg-[#121212] rounded-lg md:rounded-xl border border-zinc-800/80 p-2 md:p-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-emerald-400 font-medium text-[11px] md:text-xs flex items-center gap-1.5 md:gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      Audio Ready
+                    </span>
+                    <span className="text-zinc-500 text-[10px] md:text-xs font-mono">
+                      {formatTime(audioProgress)} / {formatTime(audioDuration)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <button 
+                      onClick={togglePlay}
+                      className="w-8 h-8 md:w-10 md:h-10 shrink-0 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center transition-colors focus:outline-none"
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4 md:w-5 md:h-5 fill-current" /> : <Play className="w-4 h-4 md:w-5 md:h-5 fill-current ml-0.5" />}
+                    </button>
+                    
+                    <input 
+                      type="range"
+                      min="0"
+                      max={audioDuration || 100}
+                      value={audioProgress}
+                      step="0.01"
+                      onChange={handleAudioSeek}
+                      className="flex-1 h-1.5 md:h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 md:[&::-webkit-slider-thumb]:w-4 md:[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-indigo-500 [&::-webkit-slider-thumb]:rounded-full"
+                    />
+                    
+                    <a
+                      href={finalAudioUrl}
+                      download={`commentary_${selectedVoice}.wav`}
+                      className="w-8 h-8 md:w-10 md:h-10 shrink-0 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 rounded-full flex items-center justify-center transition-colors"
+                      title="Download .WAV"
+                    >
+                      <Download className="w-4 h-4 md:w-5 md:h-5" />
+                    </a>
+                  </div>
+                  
                   <audio 
+                    ref={audioRef}
                     src={finalAudioUrl} 
-                    controls 
-                    className="max-w-[60%] md:max-w-[70%] h-6 md:h-8 outline-none [&::-webkit-media-controls-enclosure]:bg-transparent [&::-webkit-media-controls-enclosure]:rounded-none"
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onEnded={() => setIsPlaying(false)}
+                    className="hidden"
                   />
                 </div>
-                
-                <a
-                  href={finalAudioUrl}
-                  download={`commentary_${selectedVoice}.wav`}
-                  className="sm:w-12 h-10 md:h-12 bg-indigo-500 text-white rounded-lg md:rounded-xl flex items-center justify-center hover:bg-indigo-600 active:scale-95 transition-all shrink-0 shadow-lg shadow-indigo-500/20"
-                  title="Download .WAV"
-                >
-                  <Download className="w-4 h-4 md:w-5 md:h-5" />
-                  <span className="sm:hidden ml-2 text-xs md:text-sm font-medium">Download</span>
-                </a>
               </motion.div>
             )}
           </AnimatePresence>
