@@ -1,0 +1,6 @@
+{
+  "name": "PART3-VG",
+  "description": "AI-powered commentary audio generator with silent gap removal and audio normalization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
