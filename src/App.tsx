@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
+import coreURL from '@ffmpeg/core?url';
+import wasmURL from '@ffmpeg/core/wasm?url';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, 
@@ -61,7 +62,6 @@ export default function App() {
 
   const loadFFmpeg = async () => {
     try {
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
       const ffmpeg = ffmpegRef.current;
       
       ffmpeg.on('progress', ({ progress, time }) => {
@@ -74,10 +74,10 @@ export default function App() {
         console.log('[FFmpeg]', message);
       });
 
-      setFfmpegLog('Downloading FFmpeg core (25MB)...');
+      setFfmpegLog('Loading Audio Engine...');
       await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL,
+        wasmURL,
       });
       setFfmpegLoaded(true);
       setFfmpegLog('');
@@ -113,7 +113,7 @@ export default function App() {
     setProgressTime(0);
 
     try {
-      const fullPrompt = `High energy commentary YouTuber. Fast and punchy delivery. Genuine reactions. Sound like watching this live.\n\nScript: ${script}`;
+      const fullPrompt = `You are recording an energetic, professional voiceover for a YouTube commentary video. Speak with high energy, clear articulation, and engaging pacing. Sound natural, fast, and punchy.\n\nScript: ${script}`;
       
       const actualVoiceToRequest = selectedVoice === 'Aoede' ? 'Zephyr' : selectedVoice;
 
@@ -458,7 +458,7 @@ export default function App() {
               </p>
             )}
             <p className="text-[9px] md:text-[10px] text-zinc-600 mt-2 md:mt-4 max-w-[180px] md:max-w-[200px] text-center px-4">
-              Downloading FFmpeg. This might take a moment.
+              Loading AI processing engine.
             </p>
           </div>
         )}
